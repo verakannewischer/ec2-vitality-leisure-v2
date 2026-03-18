@@ -1,0 +1,83 @@
+{
+  "features": [
+    "weekday_num",
+    "is_weekend",
+    "month",
+    "season",
+    "month_sin",
+    "month_cos",
+    "wd_sin",
+    "wd_cos",
+    "doy_sin",
+    "doy_cos",
+    "temp_num",
+    "temp_c",
+    "precip_mm",
+    "is_public_holiday",
+    "is_school_holiday",
+    "wday_0",
+    "wday_1",
+    "wday_2",
+    "wday_3",
+    "wday_4",
+    "wday_5",
+    "wday_6",
+    "wx_cloudy",
+    "wx_rainy",
+    "wx_snowy",
+    "wx_sunny",
+    "tc_cool",
+    "tc_freezing",
+    "tc_hot",
+    "tc_mild",
+    "tc_warm"
+  ],
+  "wday_cols": [
+    "wday_0",
+    "wday_1",
+    "wday_2",
+    "wday_3",
+    "wday_4",
+    "wday_5",
+    "wday_6"
+  ],
+  "wx_cols": [
+    "wx_cloudy",
+    "wx_rainy",
+    "wx_snowy",
+    "wx_sunny"
+  ],
+  "tc_cols": [
+    "tc_cool",
+    "tc_freezing",
+    "tc_hot",
+    "tc_mild",
+    "tc_warm"
+  ],
+  "temp_order": {
+    "freezing": 0,
+    "cool": 1,
+    "mild": 2,
+    "warm": 3,
+    "hot": 4
+  },
+  "cv_mae": 211.09632385876412,
+  "r2": 0.7741380134907121,
+  "mean_visitors": 1129.5865415723067,
+  "std_visitors": 279.2067359928119,
+  "max_capacity": 2400,
+  "weather_categories": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "temp_categories": [
+    "cool",
+    "freezing",
+    "hot",
+    "mild",
+    "warm"
+  ],
+  "has_numeric_weather": true
+}

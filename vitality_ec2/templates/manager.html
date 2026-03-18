@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Manager Dashboard — Vitality{% endblock %}
+
+{% block content %}
+<div class="page">
+<div class="container">
+
+    <!-- Header -->
+    <div class="page-header">
+        <a href="/" class="label" style="text-decoration:none; opacity:0.7;">← Back</a>
+        <h1 class="display-title mt-2">Manager<br>Dashboard</h1>
+        <p class="display-subtitle mt-1">Visitor forecast and operational insights</p>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid mb-6">
+        <div class="kpi-card">
+            <div class="label">This week</div>
+            <div class="kpi-number">{{ "{:,}".format(total7) }}</div>
+            <div class="kpi-label">Visitors expected</div>
+        </div>
+
+        <div class="kpi-card {% if delta >= 0 %}green{% else %}rust{% endif %}">
+            <div class="label">Daily average</div>
+            <div class="kpi-number">{{ "{:,}".format(avg7) }}</div>
+            <div class="kpi-label">7-day average</div>
+            <div class="kpi-sub">
+                {% if delta >= 0 %}▲{% else %}▼{% endif %}
+                vs monthly avg ({{ "{:,}".format(mon_ref|int) }})
+            </div>
+        </div>
+
+        <div class="kpi-card gold">
+            <div class="label">Peak day</div>
+            <div class="kpi-number">{{ "{:,}".format(peak.visitors) }}</div>
+            <div class="kpi-label">{{ peak.weekday_short }} {{ peak.date }}</div>
+            {% if peak.is_public_holiday %}<div class="kpi-sub">🎉 Public holiday</div>
+            {% elif peak.is_school_holiday %}<div class="kpi-sub">🏫 School holiday</div>{% endif %}
+        </div>
+
+        <div class="kpi-card {% if avg_cap > 80 %}rust{% elif avg_cap > 55 %}gold{% else %}green{% endif %}">
+            <div class="label">Avg capacity</div>
+            <div class="kpi-number">{{ avg_cap }}%</div>
+            <div class="kpi-label">of {{ "{:,}".format(max_capacity) }} max</div>
+            <div class="kpi-sub">
+                {% if avg_cap > 80 %}Near capacity
+                {% elif avg_cap > 55 %}Moderate load
+                {% else %}Comfortable{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 7-day bar chart -->
+    <div class="chart-container mb-6">
+        <div class="chart-title">7-Day Visitor Forecast</div>
+        <div class="bar-chart" id="barChart" style="position:relative;">
+            <!-- Capacity line will be injected by JS -->
+        </div>
+    </div>
+
+    <!-- Capacity bars -->
+    <div class="chart-container mb-6">
+        <div class="chart-title">Daily Capacity Overview</div>
+        <div class="cap-grid">
+            {% for r in fc7 %}
+            {% set pct = r.cap_pct %}
+            {% if pct < 55 %}{% set cap_color = 'var(--leaf)' %}
+            {% elif pct < 80 %}{% set cap_color = 'var(--gold)' %}
+            {% else %}{% set cap_color = 'var(--rust)' %}{% endif %}
+            <div class="cap-day">
+                <div class="cap-day-name">{{ r.weekday_short }}{% if r.is_public_holiday %} 🎉{% elif r.is_school_holiday %} 🏫{% endif %}</div>
+                <div class="cap-day-pct" style="color:{{ cap_color }}">{{ pct }}%</div>
+                <div class="cap-bar-track">
+                    <div class="cap-bar-fill" style="background:{{ cap_color }}; width:{{ pct }}%"></div>
+                </div>
+                <div class="cap-day-count">{{ "{:,}".format(r.visitors) }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Daily breakdown table -->
+    <div class="chart-container mb-6">
+        <div class="chart-title">Daily Breakdown</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Weather</th>
+                    <th>Temp</th>
+                    <th>Precip</th>
+                    <th>Visitors</th>
+                    <th>Capacity</th>
+                    <th>Crowd</th>
+                    <th>Holiday</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in fc7 %}
+            <tr>
+                <td style="font-weight:500">{{ r.date }}</td>
+                <td>{{ r.wx|title }}</td>
+                <td>{{ r.temp }}</td>
+                <td>{{ r.precip }}</td>
+                <td style="font-weight:500">{{ "{:,}".format(r.visitors) }}</td>
+                <td>{{ r.cap_pct }}%</td>
+                <td>
+                    <span class="badge badge-{{ r.crowd_level }}">{{ r.crowd_label }}</span>
+                </td>
+                <td style="color:var(--caramel); font-size:0.8rem">
+                    {% if r.is_public_holiday %}🎉 Public
+                    {% elif r.is_school_holiday %}🏫 School
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Monthly outlook -->
+    <div class="chart-container mb-6">
+        <div class="chart-title">Monthly Visitor Outlook — Next 6 Months</div>
+        <div class="bar-chart" id="monthlyChart" style="position:relative;"></div>
+    </div>
+
+    <!-- Historical heatmap -->
+    <div class="chart-container mb-6">
+        <div class="chart-title">Historical Heatmap — Average Visitors by Weekday × Month</div>
+        <div id="heatmapContainer"></div>
+    </div>
+
+</div>
+</div>
+
+<script>
+// ── Bar chart: 7-day ──────────────────────────────────────────
+const fc7 = {{ fc7|tojson }};
+const maxCapacity = {{ max_capacity }};
+const maxVisitors = Math.max(...fc7.map(r => r.visitors));
+const chartEl = document.getElementById('barChart');
+
+// Capacity line position
+const capLineY = 100 - (maxCapacity / (maxVisitors * 1.15)) * 100;
+if (capLineY > 0 && capLineY < 100) {
+    const line = document.createElement('div');
+    line.className = 'capacity-line';
+    line.style.bottom = ((maxCapacity / (maxVisitors * 1.15)) * 100) + '%';
+    line.innerHTML = '<span class="capacity-line-label">Max ' + maxCapacity.toLocaleString() + '</span>';
+    chartEl.appendChild(line);
+}
+
+fc7.forEach(r => {
+    const col = document.createElement('div');
+    col.className = 'bar-col';
+    const heightPct = (r.visitors / (maxVisitors * 1.15)) * 100;
+    let color = 'var(--leaf)';
+    if (r.visitors >= 1350) color = 'var(--rust)';
+    else if (r.visitors >= 900) color = 'var(--caramel)';
+    const holiday = r.is_public_holiday ? ' 🎉' : r.is_school_holiday ? ' 🏫' : '';
+    col.innerHTML = `
+        <div class="bar-fill" style="height:${heightPct}%; background:${color}; opacity:0.85"
+             data-value="${r.visitors.toLocaleString()}"></div>
+        <div class="bar-label">${r.weekday_short}${holiday}<br><small style="opacity:0.7">${r.date.split(' ').slice(1).join(' ')}</small></div>`;
+    chartEl.appendChild(col);
+});
+
+// ── Bar chart: monthly ────────────────────────────────────────
+const monthly = {{ monthly|tojson }};
+const monthEl  = document.getElementById('monthlyChart');
+const maxMonth = Math.max(...monthly.map(r => r.expected));
+monthly.forEach(r => {
+    const col = document.createElement('div');
+    col.className = 'bar-col';
+    const heightPct = (r.expected / (maxMonth * 1.12)) * 100;
+    col.innerHTML = `
+        <div class="bar-fill" style="height:${heightPct}%; background:var(--caramel); opacity:0.7"
+             data-value="${r.expected.toLocaleString()}"></div>
+        <div class="bar-label">${r.label}</div>`;
+    monthEl.appendChild(col);
+});
+
+// ── Heatmap ───────────────────────────────────────────────────
+const heatmap = {{ heatmap|tojson }};
+const hmEl    = document.getElementById('heatmapContainer');
+const allVals = heatmap.values.flat();
+const hmMin   = Math.min(...allVals);
+const hmMax   = Math.max(...allVals);
+
+// Month headers
+const headerRow = document.createElement('div');
+headerRow.style.cssText = 'display:grid; grid-template-columns: 80px repeat(' + heatmap.months.length + ',1fr); gap:3px; margin-bottom:4px;';
+headerRow.innerHTML = '<div></div>' + heatmap.months.map(m =>
+    `<div style="font-size:0.65rem; text-align:center; color:var(--caramel); letter-spacing:0.08em">${m}</div>`
+).join('');
+hmEl.appendChild(headerRow);
+
+// Rows
+heatmap.days.forEach((day, di) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid; grid-template-columns: 80px repeat(' + heatmap.months.length + ',1fr); gap:3px; margin-bottom:3px;';
+    row.innerHTML = `<div style="font-size:0.72rem; color:var(--caramel); display:flex; align-items:center">${day.slice(0,3)}</div>`;
+    heatmap.values[di].forEach(val => {
+        const intensity = (val - hmMin) / (hmMax - hmMin);
+        const r = Math.round(245 - intensity * 120);
+        const g = Math.round(240 - intensity * 100);
+        const b = Math.round(232 - intensity * 80);
+        const cell = document.createElement('div');
+        cell.className = 'heatmap-cell';
+        cell.style.background = `rgb(${r},${g},${b})`;
+        cell.style.color = intensity > 0.6 ? 'rgba(44,24,16,0.9)' : 'rgba(139,110,78,0.8)';
+        cell.textContent = Math.round(val);
+        cell.title = `${day} — avg ${Math.round(val)} visitors`;
+        row.appendChild(cell);
+    });
+    hmEl.appendChild(row);
+});
+</script>
+{% endblock %}

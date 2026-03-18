@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Vitality Leisure Park — Capacity Intelligence{% endblock %}
+
+{% block content %}
+<div class="page">
+
+    <!-- Hero -->
+    <section class="landing-hero">
+        <div class="hero-text">
+            <p class="hero-eyebrow">Vitality Leisure Park · Leisure City</p>
+            <h1 class="hero-title fade-up">Capacity<br>Intelligence<br><em style="font-style:italic; color:var(--caramel)">Viewer</em></h1>
+            <p class="hero-sub fade-up-delay-1">AI-powered forecasts for smarter operations<br>and better guest experiences</p>
+
+            {% if weather %}
+            <div class="weather-chip fade-up-delay-2">
+                <span>Today</span>
+                <span style="color:var(--espresso)">{{ weather.label }}</span>
+                <span>·</span>
+                <span style="color:var(--espresso)">{{ weather.temp }}</span>
+                {% if weather.is_holiday %}<span>· 🎉 Public Holiday</span>{% endif %}
+                {% if weather.is_school %}<span>· 🏫 School Holiday</span>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Nav cards -->
+    <section class="landing-cards">
+        <a href="/manager" class="landing-card fade-up-delay-1">
+            <span class="landing-card-icon">📊</span>
+            <h2 class="landing-card-title">Manager Dashboard</h2>
+            <p class="landing-card-desc">7-day visitor forecast with capacity tracking, staffing signals, monthly outlook, and historical trend analysis.</p>
+            <span class="landing-card-cta">Open dashboard</span>
+        </a>
+
+        <a href="/visitor" class="landing-card fade-up-delay-2">
+            <span class="landing-card-icon">🔍</span>
+            <h2 class="landing-card-title">Plan My Visit</h2>
+            <p class="landing-card-desc">Filter by crowd preference, weather, and day of week. Find the perfect day to visit — quiet, lively, or anything in between.</p>
+            <span class="landing-card-cta">Plan your visit</span>
+        </a>
+
+        <a href="/wellness" class="landing-card wellness-card fade-up-delay-3">
+            <span class="landing-card-icon">🌿</span>
+            <h2 class="landing-card-title">Wellness Coach</h2>
+            <p class="landing-card-desc">Tell us how you feel. Receive a personalised spa day plan grounded in live crowd data, real menus, and your needs.</p>
+            <span class="landing-card-cta">Begin</span>
+        </a>
+    </section>
+
+    <!-- Model stats strip -->
+    <footer class="footer-strip">
+        Model accuracy ≈ ±{{ "%.0f"|format(cv_mae) }} visitors/day &nbsp;·&nbsp;
+        R² {{ "%.2f"|format(r2) }} &nbsp;·&nbsp;
+        Trained on 6,000+ daily records (2008–2025) &nbsp;·&nbsp;
+        Max capacity {{ "{:,}".format(max_capacity) }} visitors
+    </footer>
+
+</div>
+{% endblock %}

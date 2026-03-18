@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Plan My Visit — Vitality{% endblock %}
+
+{% block content %}
+<div class="page">
+<div class="container">
+
+    <div class="page-header">
+        <a href="/" class="label" style="text-decoration:none; opacity:0.7;">← Back</a>
+        <h1 class="display-title mt-2">Plan My Visit</h1>
+        <p class="display-subtitle mt-1">Tell us your preferences — we'll find your perfect day</p>
+    </div>
+
+    <!-- Preferences -->
+    <div class="chart-container mb-4">
+        <div class="chart-title">Your Preferences</div>
+        <div class="pref-grid">
+            <div class="pref-item">
+                <label>Planning window</label>
+                <select id="horizon">
+                    <option value="7">Next 7 days</option>
+                    <option value="14">Next 14 days</option>
+                </select>
+            </div>
+            <div class="pref-item">
+                <label>Crowd preference</label>
+                <select id="crowd">
+                    <option value="quiet">I prefer it quiet</option>
+                    <option value="any">Doesn't matter</option>
+                    <option value="lively">I like lively days</option>
+                </select>
+            </div>
+            <div class="pref-item">
+                <label>Weather preference</label>
+                <select id="weather">
+                    <option value="sunny">Sunny preferred</option>
+                    <option value="any">Don't care</option>
+                    <option value="rain">Rain is fine</option>
+                </select>
+            </div>
+            <div class="pref-item">
+                <label>Preferred weekday</label>
+                <select id="weekday">
+                    <option value="">Any day</option>
+                    <option>Monday</option>
+                    <option>Tuesday</option>
+                    <option>Wednesday</option>
+                    <option>Thursday</option>
+                    <option>Friday</option>
+                    <option>Saturday</option>
+                    <option>Sunday</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-forest" onclick="updateRecommendations()">Find My Best Day →</button>
+    </div>
+
+    <!-- Warning -->
+    <div id="sunWarning" class="banner-warning" style="display:none">
+        <strong>☀️ No sunny days in the forecast window.</strong>
+        <span id="sunWarningText"></span> Showing best available options.
+    </div>
+
+    <!-- Top recommendation -->
+    <div id="topRec" class="rec-card mb-4" style="display:none">
+        <div class="label" style="color:var(--sand); margin-bottom:0.75rem">⭐ Best recommendation for you</div>
+        <div class="rec-card-date" id="recDate">—</div>
+        <div class="rec-card-detail" id="recDetail">—</div>
+        <div class="mt-3 grid-2" style="max-width:500px">
+            <div>
+                <div class="label" style="color:var(--sand)">Expected visitors</div>
+                <div style="font-family:var(--font-display); font-size:2rem; font-weight:300; color:var(--cream)" id="recVisitors">—</div>
+            </div>
+            <div>
+                <div class="label" style="color:var(--sand)">Capacity used</div>
+                <div style="font-family:var(--font-display); font-size:2rem; font-weight:300" id="recCapacity">—</div>
+                <div class="gauge-track mt-1">
+                    <div class="gauge-fill" id="recGaugeFill" style="width:0%; background:var(--leaf)"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- All ranked -->
+    <div class="chart-container mb-6">
+        <div class="chart-title">All Days Ranked</div>
+        <div class="rank-grid" id="rankGrid">
+            <div style="color:var(--caramel); font-style:italic; padding:1rem; grid-column:1/-1">
+                Select your preferences above and click "Find My Best Day"
+            </div>
+        </div>
+    </div>
+
+    <!-- Tips -->
+    <div class="grid-3 mb-6">
+        <div class="card">
+            <div class="label mb-4">☀️ Weather & crowds</div>
+            <p style="font-size:0.875rem; color:var(--caramel); line-height:1.7">Sunny days draw the most visitors. For a quieter experience, cloudy days are your friend.</p>
+        </div>
+        <div class="card">
+            <div class="label mb-4">📅 Holiday periods</div>
+            <p style="font-size:0.875rem; color:var(--caramel); line-height:1.7">School holidays 🏫 and public holidays 🎉 consistently see higher visitor numbers — plan accordingly.</p>
+        </div>
+        <div class="card">
+            <div class="label mb-4">🌧️ Rainy days</div>
+            <p style="font-size:0.875rem; color:var(--caramel); line-height:1.7">Usually the quietest. Indoor thermal areas stay comfortable regardless of weather outside.</p>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<script>
+const allFc = {{ fc|tojson }};
+const maxCap = {{ max_capacity }};
+
+const medals = ['🥇','🥈','🥉','4','5','6','7','8','9','10','11','12','13','14'];
+
+function scoreDay(r, crowd, weather) {
+    let s = 100;
+    if (crowd === 'quiet')  s -= Math.max(0, (r.visitors - 800) / 6);
+    if (crowd === 'lively') s -= Math.max(0, (1100 - r.visitors) / 8);
+    if (weather === 'sunny' && r.wx !== 'sunny') s -= 30;
+    if (weather !== 'rain' && (r.wx === 'rainy' || r.wx === 'snowy')) s -= 20;
+    return Math.max(0, s);
+}
+
+function updateRecommendations() {
+    const n       = parseInt(document.getElementById('horizon').value);
+    const crowd   = document.getElementById('crowd').value;
+    const weather = document.getElementById('weather').value;
+    const weekday = document.getElementById('weekday').value;
+
+    let fc = allFc.slice(0, n);
+    if (weekday) fc = fc.filter(r => r.weekday === weekday);
+    if (!fc.length) fc = allFc.slice(0, n);
+
+    // Score and sort
+    fc = fc.map(r => ({...r, score: scoreDay(r, crowd, weather)}));
+    fc.sort((a,b) => b.score - a.score);
+
+    // Sunny warning
+    const hasSunny = fc.some(r => r.wx === 'sunny');
+    const sunWarn = document.getElementById('sunWarning');
+    if (weather === 'sunny' && !hasSunny) {
+        const counts = {};
+        fc.forEach(r => counts[r.wx] = (counts[r.wx]||0)+1);
+        document.getElementById('sunWarningText').textContent = ' Available: ' + Object.entries(counts).map(([k,v]) => `${k} (${v}d)`).join(' · ') + '.';
+        sunWarn.style.display = 'block';
+    } else {
+        sunWarn.style.display = 'none';
+    }
+
+    // Top recommendation
+    const top = fc[0];
+    document.getElementById('topRec').style.display = 'block';
+    document.getElementById('recDate').textContent = top.weekday + ' · ' + top.date;
+    document.getElementById('recDetail').textContent =
+        top.wx.charAt(0).toUpperCase()+top.wx.slice(1) + ' · ' + top.temp +
+        (top.is_public_holiday ? ' · 🎉 Public holiday' : top.is_school_holiday ? ' · 🏫 School holiday' : '');
+    document.getElementById('recVisitors').textContent = top.visitors.toLocaleString();
+    const capPct = Math.min(100, Math.round(top.visitors / maxCap * 100));
+    const capColor = capPct < 55 ? 'var(--leaf)' : capPct < 80 ? 'var(--caramel)' : 'var(--rust)';
+    document.getElementById('recCapacity').textContent = capPct + '%';
+    document.getElementById('recCapacity').style.color = capColor;
+    document.getElementById('recGaugeFill').style.width = capPct + '%';
+    document.getElementById('recGaugeFill').style.background = capColor;
+
+    // Ranked grid
+    const grid = document.getElementById('rankGrid');
+    grid.innerHTML = '';
+    fc.forEach((r, i) => {
+        const badgeCls = r.crowd_level === 'quiet' ? 'badge-quiet' : r.crowd_level === 'busy' ? 'badge-busy' : 'badge-moderate';
+        const hday = r.is_public_holiday ? ' 🎉' : r.is_school_holiday ? ' 🏫' : '';
+        const item = document.createElement('div');
+        item.className = 'rank-item fade-up';
+        item.style.animationDelay = (i * 0.04) + 's';
+        item.innerHTML = `
+            <div class="rank-num">${medals[i] || '#'+(i+1)}</div>
+            <div class="rank-date">${r.weekday.slice(0,3)} · ${r.date}${hday}</div>
+            <div class="rank-detail">${r.wx.charAt(0).toUpperCase()+r.wx.slice(1)} · ${r.temp}</div>
+            <div class="rank-detail">${r.visitors.toLocaleString()} visitors · ${r.cap_pct}% capacity</div>
+            <div class="mt-1"><span class="badge ${badgeCls}">${r.crowd_label}</span></div>`;
+        grid.appendChild(item);
+    });
+}
+
+// Auto-run on load
+updateRecommendations();
+</script>
+{% endblock %}
